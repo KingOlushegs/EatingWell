@@ -1,6 +1,6 @@
 import os
-from dotenv import load_dotenv  # Add this line
-load_dotenv()                   # Add this line too
+from dotenv import load_dotenv
+load_dotenv()
 import streamlit as st
 from google import genai
 from google.genai import types
@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from PIL import Image
 import tempfile
+import json
 
 # -------------------------------------------------------------------
 # 1. DATA STRUCTURES & PYDANTIC STRUCTURAL SCHEMAS
@@ -27,18 +28,59 @@ class MealAnalysis(BaseModel):
     total_calories: int = Field(description="Sum of all calories.")
 
 # -------------------------------------------------------------------
-# 2. CORE BACKEND INGESTION ENGINES (GEMINI & FALLBACK)
+# 2. PERSISTENT LOCAL DATABASE MECHANICS (JSON LAYER)
 # -------------------------------------------------------------------
-# Securely extract the key from the system environment variables
-api_key_env = os.environ.get("GEMINI_API_KEY")
+DB_FILE = "food_diary.json"
 
-# Initialize the client securely if key exists, otherwise let UI handle error gracefully
+def load_stored_history():
+    """Loads the permanent food diary from the local JSON file asset."""
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_meal_to_history(meal_analysis: MealAnalysis):
+    """Appends a newly calculated meal into the permanent JSON storage tracker."""
+    history = load_stored_history()
+    history.append(meal_analysis.model_dump())
+    with open(DB_FILE, "w") as f:
+        json.dump(history, f, indent=4)
+
+def clear_permanent_history():
+    """Wipes the local JSON file database clean to reset the tracking timeline."""
+    if os.path.exists(DB_FILE):
+        os.remove(DB_FILE)
+
+# Initialize and cache history data inside session memory cleanly
+if "food_history" not in st.session_state:
+    st.session_state.food_history = load_stored_history()
+
+# Calculate baseline profile stats dynamically based on permanent consumption history
+base_protein = 42
+base_stamina = 64
+base_clarity = 75
+
+for past_meal in st.session_state.food_history:
+    for ing in past_meal.get("ingredients", []):
+        base_protein = min(100, base_protein + int(ing.get("protein_g", 0)))
+        base_stamina = min(100, base_stamina + int(ing.get("carbs_g", 0) * 0.5))
+
+st.session_state.protein_pool = base_protein
+st.session_state.stamina_pool = base_stamina
+st.session_state.clarity_pool = base_clarity
+
+# -------------------------------------------------------------------
+# 3. CORE BACKEND INGESTION ENGINES (GEMINI & FALLBACK)
+# -------------------------------------------------------------------
+api_key_env = os.environ.get("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key_env) if api_key_env else None
 
 def autonomous_logger(raw_input: str, image_file=None) -> MealAnalysis:
     """Parses text and stream imagery into structured nutritional data."""
     if not client:
-        # If API Key environment variable is missing, fall back immediately to local database
         return local_heuristic_fallback(raw_input or "Uploaded Image Track")
 
     base_prompt = (
@@ -48,10 +90,8 @@ def autonomous_logger(raw_input: str, image_file=None) -> MealAnalysis:
     )
     
     contents = [base_prompt]
-    
     if raw_input:
         contents.append(f"User Text Description: {raw_input}")
-        
     if image_file:
         try:
             img = Image.open(image_file)
@@ -70,8 +110,7 @@ def autonomous_logger(raw_input: str, image_file=None) -> MealAnalysis:
             ),
         )
         return MealAnalysis.model_validate_json(response.text)
-    except Exception as network_error:
-        # If network error or token limit hit, safety bridge to local offline DB
+    except Exception:
         return local_heuristic_fallback(raw_input or "Image Scan Fallback")
 
 def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
@@ -110,12 +149,7 @@ def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
             
     if not detected_ingredients:
         detected_ingredients.append(Ingredient(
-            name="Unspecified Meal Volume",
-            estimated_weight_g=200,
-            protein_g=15.0,
-            carbs_g=30.0,
-            fats_g=10.0,
-            calories=270
+            name="Unspecified Meal Volume", estimated_weight_g=200, protein_g=15.0, carbs_g=30.0, fats_g=10.0, calories=270
         ))
         
     total_cal = sum(ing.calories for ing in detected_ingredients)
@@ -128,19 +162,10 @@ def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
     )
 
 # -------------------------------------------------------------------
-# 3. STREAMLIT APPLICATION STATE CONFIGURATIONS
+# 4. STREAMLIT APPLICATION STATE CONFIGURATIONS
 # -------------------------------------------------------------------
 st.set_page_config(page_title="Eating Well // Bio-Intelligence Engine", layout="wide")
 
-# Persistent state mapping for state pools across application reruns
-if "protein_pool" not in st.session_state:
-    st.session_state.protein_pool = 42  
-if "stamina_pool" not in st.session_state:
-    st.session_state.stamina_pool = 64
-if "clarity_pool" not in st.session_state:
-    st.session_state.clarity_pool = 75
-
-# Immersive dark aesthetic stylesheets
 st.markdown("""
     <style>
     .reportview-container { background: #050505; color: #E0E0E0; }
@@ -162,13 +187,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("EATING WELL // BIOLOGICAL INTERFACE")
-st.caption("A16Z SPEEDRUN SYSTEM ARCHITECTURE V2.0 // THE PROACTIVE HEALTH HUD")
+st.caption("A16Z SPEEDRUN SYSTEM ARCHITECTURE V2.2 // THE PERSISTENT HEALTH HUD")
 
 if not api_key_env:
     st.warning("⚠️ Running in Local Fallback Node. GEMINI_API_KEY environment variable not configured.")
 
 # -------------------------------------------------------------------
-# 4. SIDEBAR: AVATAR HUD COMPONENT
+# 5. SIDEBAR: AVATAR HUD COMPONENT
 # -------------------------------------------------------------------
 with st.sidebar:
     st.header("👤 AVATAR PROFILE")
@@ -187,15 +212,14 @@ with st.sidebar:
     st.caption(f"Current Value: **{st.session_state.clarity_pool}/100**")
     
     st.markdown("---")
-    st.subheader("🧪 Core Reset Framework")
-    if st.button("Reset Avatar Buff Pools"):
-        st.session_state.protein_pool = 42
-        st.session_state.stamina_pool = 64
-        st.session_state.clarity_pool = 75
+    st.subheader("🧪 Core Database Reset")
+    if st.button("Wipe Permanent Food Logs"):
+        clear_permanent_history()
+        st.session_state.food_history = []
         st.rerun()
 
 # -------------------------------------------------------------------
-# 5. CORE INTERACTION SECTION: AUDIO, PHOTO, & STRING PROCESSING
+# 6. CORE INTERACTION SECTION: AUDIO, PHOTO, & STRING PROCESSING
 # -------------------------------------------------------------------
 st.header("📸 INGESTION HUD: VISION & VOICE MULTIMODAL LOOP")
 
@@ -216,20 +240,10 @@ with tab1:
     if execute_analysis:
         with st.spinner("Analyzing macro vectors via Gemini 2.5 Engine..."):
             analysis_result = autonomous_logger(text_desc, uploaded_image)
-            
-            # Print complete structured schema results
-            st.markdown("### 📊 Pixel Scanning Readout")
-            st.json(analysis_result.model_dump())
-            
-            # Extract total nutrient metrics to reward the local session stats
-            total_protein_g = sum(ing.protein_g for ing in analysis_result.ingredients)
-            total_carbs_g = sum(ing.carbs_g for ing in analysis_result.ingredients)
-            
-            # Apply math modifiers cleanly to update our cached UI sidebar bars
-            st.session_state.protein_pool = min(100, int(st.session_state.protein_pool + total_protein_g))
-            st.session_state.stamina_pool = min(100, int(st.session_state.stamina_pool + (total_carbs_g * 0.5)))
-            st.success(f"🧬 Stats updated! Added **{int(total_protein_g)}g** Protein to Strength Pool.")
-            st.button("Synchronize HUD Updates")
+            save_meal_to_history(analysis_result)
+            st.session_state.food_history = load_stored_history()
+            st.success("🧬 Macro asset securely mapped to local database diary.")
+            st.rerun()
 
 with tab2:
     st.write("Communicate directly with your AI Guardian hands-free while driving, train-loading, or shopping.")
@@ -275,32 +289,39 @@ with tab2:
                     
                     if os.path.exists(temp_audio_path):
                         os.remove(temp_audio_path)
-                        
-                    total_protein_g = sum(ing.protein_g for ing in analysis_result.ingredients)
-                    total_carbs_g = sum(ing.carbs_g for ing in analysis_result.ingredients)
                     
-                    st.session_state.protein_pool = min(100, int(st.session_state.protein_pool + total_protein_g))
-                    st.session_state.stamina_pool = min(100, int(st.session_state.stamina_pool + (total_carbs_g * 0.5)))
-                    
-                    st.session_state.voice_analysis_cache = analysis_result
+                    # Lock data to database permanently before refreshing state
+                    save_meal_to_history(analysis_result)
+                    st.session_state.food_history = load_stored_history()
                     st.session_state.last_processed_voice = voice_capture.name
-                    st.sidebar.success("🧬 Biometric HUD sync complete!")
                     st.rerun()
 
                 except Exception as audio_err:
                     st.error(f"❌ Error compiling voice array: {audio_err}")
-        
-        if "voice_analysis_cache" in st.session_state:
-            st.markdown(f"""
-                <div class="hud-card" style="border-color: #39FF14;">
-                    <p class="guardian-text">// TARGET LOG IDENTIFIED: {st.session_state.voice_analysis_cache.meal_name.upper()}</p>
-                    <p style="color: #FFFFFF; font-weight: bold;">Calories Tracked: {st.session_state.voice_analysis_cache.total_calories} kcal</p>
-                </div>
-            """, unsafe_allow_html=True)
-            st.json(st.session_state.voice_analysis_cache.model_dump())
 
 # -------------------------------------------------------------------
-# 6. ADVANCED PROACTIVE MECHANICS: THE NEXT QUEST & ACTIVITY SYNC
+# 7. HISTORICAL ACTIVITY STREAM (THE EYE OF THE ENGINE)
+# -------------------------------------------------------------------
+st.markdown("---")
+st.header("📜 HISTORICAL MACRO RECONSTRUCTION DIARY")
+
+if st.session_state.food_history:
+    # Display historical cards in reverse chronological order (newest first)
+    for index, past_meal in enumerate(reversed(st.session_state.food_history)):
+        with st.container():
+            st.markdown(f"""
+                <div class="hud-card" style="border-color: #39FF14; margin-bottom: 12px;">
+                    <span class="guardian-text">// TARGET INSTANCE LOGIFIED: {past_meal.get('meal_name', 'UNKNOWN LOG').upper()}</span>
+                    <h4 style="color: #FFFFFF; margin: 5px 0;">Total Structural Intakes: {past_meal.get('total_calories', 0)} kcal</h4>
+                </div>
+            """, unsafe_allow_html=True)
+            with st.expander(f"Inspect Macro Array Breakdown for {past_meal.get('meal_name')}"):
+                st.json(past_meal)
+else:
+    st.info("No biometric meal tracks registered inside the permanent data array yet. Speak or upload a meal target above to initialize.")
+
+# -------------------------------------------------------------------
+# 8. ADVANCED PROACTIVE MECHANICS: THE NEXT QUEST & ACTIVITY SYNC
 # -------------------------------------------------------------------
 st.markdown("---")
 st.header("🎯 CONTEXTUAL OPTIMIZATION LAYER")
