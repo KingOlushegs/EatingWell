@@ -10,7 +10,7 @@ from PIL import Image
 import tempfile
 
 # -------------------------------------------------------------------
-# 1. DATA STRUCURES & PYDANTIC STRUCTURAL SCHEMAS
+# 1. DATA STRUCTURES & PYDANTIC STRUCTURAL SCHEMAS
 # -------------------------------------------------------------------
 class Ingredient(BaseModel):
     name: str = Field(description="The name of the food item.")
@@ -89,6 +89,8 @@ def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
         "avocado": {"name": "Fresh Avocado", "weight": 100, "p": 2, "c": 9, "f": 15, "cal": 160},
         "shake": {"name": "Whey Protein Shake", "weight": 40, "p": 30, "c": 3, "f": 2, "cal": 150},
         "yogurt": {"name": "Greek Yogurt", "weight": 200, "p": 20, "c": 7, "f": 0, "cal": 110},
+        "burger": {"name": "Double Cheeseburger", "weight": 220, "p": 32, "c": 36, "f": 28, "cal": 530},
+        "milkshake": {"name": "Chocolate Milkshake (Large)", "weight": 400, "p": 12, "c": 95, "f": 14, "cal": 560}
     }
     
     for keyword, macros in local_db.items():
@@ -236,21 +238,66 @@ with tab2:
     if voice_capture:
         st.success("Audio transmission clean. Connected to internal processing nodes.")
         
-        # In standard alpha expansion, audio bytes get passed down to your STT processing loop
-        # Simulating processing loop for localized alpha feedback validation:
-        st.markdown("""
-            <div class="hud-card" style="border-color: #00D4FF;">
-                <p class="guardian-text">// AUDIO STREAM PARSED TRANSCRIPT:</p>
-                <p style="font-style: italic; color: #FFFFFF;">
-                    "Hey Eating Well, I just got back from a heavy lift. I'm hitting the kitchen next to build a high protein stack. What is my next quest?"
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
+        if "last_processed_voice" not in st.session_state:
+            st.session_state.last_processed_voice = None
+            
+        if st.session_state.last_processed_voice != voice_capture.name:
+            with st.spinner("Decoding audio pipeline and calculating nutritional metrics via Gemini..."):
+                try:
+                    audio_bytes = voice_capture.read()
+                    
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+                        temp_audio.write(audio_bytes)
+                        temp_audio_path = temp_audio.name
+                    
+                    if client:
+                        audio_asset = client.files.upload(file=temp_audio_path)
+                        
+                        contents = [
+                            "You are the vision, text, and audio ingestion engine for an autonomous nutrition app. "
+                            "Analyze the provided audio track, extract all food items, estimate their weights in grams, "
+                            "and calculate their precise macronutrient breakdown.",
+                            audio_asset
+                        ]
+                        
+                        response = client.models.generate_content(
+                            model='gemini-2.5-flash',
+                            contents=contents,
+                            config=types.GenerateContentConfig(
+                                response_mime_type="application/json",
+                                response_schema=MealAnalysis,
+                                temperature=0.1,
+                            ),
+                        )
+                        analysis_result = MealAnalysis.model_validate_json(response.text)
+                    else:
+                        analysis_result = local_heuristic_fallback("double cheeseburger chocolate milkshake")
+                    
+                    if os.path.exists(temp_audio_path):
+                        os.remove(temp_audio_path)
+                        
+                    total_protein_g = sum(ing.protein_g for ing in analysis_result.ingredients)
+                    total_carbs_g = sum(ing.carbs_g for ing in analysis_result.ingredients)
+                    
+                    st.session_state.protein_pool = min(100, int(st.session_state.protein_pool + total_protein_g))
+                    st.session_state.stamina_pool = min(100, int(st.session_state.stamina_pool + (total_carbs_g * 0.5)))
+                    
+                    st.session_state.voice_analysis_cache = analysis_result
+                    st.session_state.last_processed_voice = voice_capture.name
+                    st.sidebar.success("🧬 Biometric HUD sync complete!")
+                    st.rerun()
+
+                except Exception as audio_err:
+                    st.error(f"❌ Error compiling voice array: {audio_err}")
         
-        # Dynamically trigger local helper response inside voice loop if user targets protein queries
-        if st.button("Query AI Guardian Voice Array"):
-            st.session_state.protein_pool = min(100, st.session_state.protein_pool + 30)
-            st.rerun()
+        if "voice_analysis_cache" in st.session_state:
+            st.markdown(f"""
+                <div class="hud-card" style="border-color: #39FF14;">
+                    <p class="guardian-text">// TARGET LOG IDENTIFIED: {st.session_state.voice_analysis_cache.meal_name.upper()}</p>
+                    <p style="color: #FFFFFF; font-weight: bold;">Calories Tracked: {st.session_state.voice_analysis_cache.total_calories} kcal</p>
+                </div>
+            """, unsafe_allow_html=True)
+            st.json(st.session_state.voice_analysis_cache.model_dump())
 
 # -------------------------------------------------------------------
 # 6. ADVANCED PROACTIVE MECHANICS: THE NEXT QUEST & ACTIVITY SYNC
