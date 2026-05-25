@@ -4,3 +4,4 @@ pillow
 pydantic
 pandas
 python-dotenv
+gTTS

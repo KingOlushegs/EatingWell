@@ -9,6 +9,8 @@ from typing import List, Optional
 from PIL import Image
 import tempfile
 import json
+import base64
+from gtts import gTTS
 
 # -------------------------------------------------------------------
 # 1. DATA STRUCTURES & PYDANTIC STRUCTURAL SCHEMAS
@@ -28,12 +30,38 @@ class MealAnalysis(BaseModel):
     total_calories: int = Field(description="Sum of all calories.")
 
 # -------------------------------------------------------------------
-# 2. PERSISTENT LOCAL DATABASE MECHANICS (JSON LAYER)
+# 2. VOICE SYNTHESIS MECHANICS (HIGH-PERFORMANCE COACH HUD)
+# -------------------------------------------------------------------
+def generate_guardian_speech(text_content: str, autoplay: bool = False):
+    """Converts the nutritional breakdown into a high-performance audio cue."""
+    try:
+        tts = gTTS(text=text_content, lang='en', tld='com', slow=False)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+            tts.save(fp.name)
+            with open(fp.name, "rb") as audio_file:
+                audio_bytes = audio_file.read()
+            os.remove(fp.name)
+            
+        b64_audio = base64.b64encode(audio_bytes).decode()
+        
+        if autoplay:
+            # Injecting hidden HTML5 audio element with autoplay protocol
+            st.markdown(
+                f'<audio src="data:audio/mp3;base64,{b64_audio}" autoplay="true" style="display:none;"></audio>',
+                unsafe_allow_html=True
+            )
+        else:
+            # Standard audio widget layout for manual requests
+            st.audio(audio_bytes, format="audio/mp3")
+    except Exception as e:
+        st.error(f"⚠️ Voice link generation stall: {e}")
+
+# -------------------------------------------------------------------
+# 3. PERSISTENT LOCAL DATABASE MECHANICS (JSON LAYER)
 # -------------------------------------------------------------------
 DB_FILE = "food_diary.json"
 
 def load_stored_history():
-    """Loads the permanent food diary from the local JSON file asset."""
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r") as f:
@@ -43,14 +71,12 @@ def load_stored_history():
     return []
 
 def save_meal_to_history(meal_analysis: MealAnalysis):
-    """Appends a newly calculated meal into the permanent JSON storage tracker."""
     history = load_stored_history()
     history.append(meal_analysis.model_dump())
     with open(DB_FILE, "w") as f:
         json.dump(history, f, indent=4)
 
 def clear_permanent_history():
-    """Wipes the local JSON file database clean to reset the tracking timeline."""
     if os.path.exists(DB_FILE):
         os.remove(DB_FILE)
 
@@ -73,13 +99,12 @@ st.session_state.stamina_pool = base_stamina
 st.session_state.clarity_pool = base_clarity
 
 # -------------------------------------------------------------------
-# 3. CORE BACKEND INGESTION ENGINES (GEMINI & FALLBACK)
+# 4. CORE BACKEND INGESTION ENGINES (GEMINI & FALLBACK)
 # -------------------------------------------------------------------
 api_key_env = os.environ.get("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key_env) if api_key_env else None
 
 def autonomous_logger(raw_input: str, image_file=None) -> MealAnalysis:
-    """Parses text and stream imagery into structured nutritional data."""
     if not client:
         return local_heuristic_fallback(raw_input or "Uploaded Image Track")
 
@@ -114,7 +139,6 @@ def autonomous_logger(raw_input: str, image_file=None) -> MealAnalysis:
         return local_heuristic_fallback(raw_input or "Image Scan Fallback")
 
 def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
-    """An internet-free backup parser that estimates macros if the Gemini API is unreachable."""
     text = raw_input.lower()
     detected_ingredients = []
     
@@ -162,7 +186,7 @@ def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
     )
 
 # -------------------------------------------------------------------
-# 4. STREAMLIT APPLICATION STATE CONFIGURATIONS
+# 5. STREAMLIT APPLICATION STATE CONFIGURATIONS
 # -------------------------------------------------------------------
 st.set_page_config(page_title="Eating Well // Bio-Intelligence Engine", layout="wide")
 
@@ -187,13 +211,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("EATING WELL // BIOLOGICAL INTERFACE")
-st.caption("A16Z SPEEDRUN SYSTEM ARCHITECTURE V2.2 // THE PERSISTENT HEALTH HUD")
+st.caption("A16Z SPEEDRUN SYSTEM ARCHITECTURE V2.3 // THE BIMODAL CONVERSATIONAL HEALTH HUD")
 
 if not api_key_env:
     st.warning("⚠️ Running in Local Fallback Node. GEMINI_API_KEY environment variable not configured.")
 
 # -------------------------------------------------------------------
-# 5. SIDEBAR: AVATAR HUD COMPONENT
+# 6. SIDEBAR: AVATAR HUD COMPONENT
 # -------------------------------------------------------------------
 with st.sidebar:
     st.header("👤 AVATAR PROFILE")
@@ -216,10 +240,12 @@ with st.sidebar:
     if st.button("Wipe Permanent Food Logs"):
         clear_permanent_history()
         st.session_state.food_history = []
+        if "visual_speech_text" in st.session_state:
+            del st.session_state.visual_speech_text
         st.rerun()
 
 # -------------------------------------------------------------------
-# 6. CORE INTERACTION SECTION: AUDIO, PHOTO, & STRING PROCESSING
+# 7. CORE INTERACTION SECTION: AUDIO, PHOTO, & STRING PROCESSING
 # -------------------------------------------------------------------
 st.header("📸 INGESTION HUD: VISION & VOICE MULTIMODAL LOOP")
 
@@ -242,8 +268,22 @@ with tab1:
             analysis_result = autonomous_logger(text_desc, uploaded_image)
             save_meal_to_history(analysis_result)
             st.session_state.food_history = load_stored_history()
+            
+            # Format the Coach voice string and cache it for the interactive player button
+            total_protein = sum(ing.protein_g for ing in analysis_result.ingredients)
+            st.session_state.visual_speech_text = (
+                f"Massive intake logged. {analysis_result.meal_name} processed at {analysis_result.total_calories} total calories. "
+                f"That is {int(total_protein)} grams of pure protein locked into your strength reserves. Fueling complete. Execute your next operational sprint."
+            )
             st.success("🧬 Macro asset securely mapped to local database diary.")
             st.rerun()
+
+    # Drop optional voice player button cleanly right under the text/image scanning response block
+    if "visual_speech_text" in st.session_state:
+        st.markdown("---")
+        st.markdown("### 🎙️ AI Guardian Voice Core")
+        st.write("Review complete. Press play below to listen to your tactical biometric readout briefing:")
+        generate_guardian_speech(st.session_state.visual_speech_text, autoplay=False)
 
 with tab2:
     st.write("Communicate directly with your AI Guardian hands-free while driving, train-loading, or shopping.")
@@ -290,23 +330,37 @@ with tab2:
                     if os.path.exists(temp_audio_path):
                         os.remove(temp_audio_path)
                     
-                    # Lock data to database permanently before refreshing state
                     save_meal_to_history(analysis_result)
                     st.session_state.food_history = load_stored_history()
                     st.session_state.last_processed_voice = voice_capture.name
+                    
+                    # Compute the voice parameters instantly for auto-playing voice response
+                    v_protein = sum(ing.protein_g for ing in analysis_result.ingredients)
+                    voice_script = (
+                        f"Massive intake logged. {analysis_result.meal_name} processed at {analysis_result.total_calories} total calories. "
+                        f"That is {int(v_protein)} grams of pure protein locked into your strength reserves. Fueling complete. Execute your next operational sprint."
+                    )
+                    
+                    # Store voice track to context so it renders text details along with audio play
+                    st.session_state.voice_autoplay_script = voice_script
                     st.rerun()
 
                 except Exception as audio_err:
                     st.error(f"❌ Error compiling voice array: {audio_err}")
+                    
+        # Automatically fire audio response through browser speakers when voice tab updates
+        if "voice_autoplay_script" in st.session_state:
+            generate_guardian_speech(st.session_state.voice_autoplay_script, autoplay=True)
+            # Clear it from state right after autoplaying so it doesn't shout every single time you navigate the page
+            del st.session_state.voice_autoplay_script
 
 # -------------------------------------------------------------------
-# 7. HISTORICAL ACTIVITY STREAM (THE EYE OF THE ENGINE)
+# 8. HISTORICAL ACTIVITY STREAM (THE EYE OF THE ENGINE)
 # -------------------------------------------------------------------
 st.markdown("---")
 st.header("📜 HISTORICAL MACRO RECONSTRUCTION DIARY")
 
 if st.session_state.food_history:
-    # Display historical cards in reverse chronological order (newest first)
     for index, past_meal in enumerate(reversed(st.session_state.food_history)):
         with st.container():
             st.markdown(f"""
@@ -321,7 +375,7 @@ else:
     st.info("No biometric meal tracks registered inside the permanent data array yet. Speak or upload a meal target above to initialize.")
 
 # -------------------------------------------------------------------
-# 8. ADVANCED PROACTIVE MECHANICS: THE NEXT QUEST & ACTIVITY SYNC
+# 9. ADVANCED PROACTIVE MECHANICS: THE NEXT QUEST & ACTIVITY SYNC
 # -------------------------------------------------------------------
 st.markdown("---")
 st.header("🎯 CONTEXTUAL OPTIMIZATION LAYER")
