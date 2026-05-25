@@ -28,11 +28,12 @@ class MealAnalysis(BaseModel):
     confidence_score: float = Field(description="Confidence rating 0.0 to 1.0.")
     ingredients: List[Ingredient]
     total_calories: int = Field(description="Sum of all calories.")
+    guardian_voice_script: Optional[str] = Field(default=None, description="The text script generated for the AI coach response.")
 
 # -------------------------------------------------------------------
 # 2. VOICE SYNTHESIS MECHANICS (HIGH-PERFORMANCE COACH HUD)
 # -------------------------------------------------------------------
-def generate_guardian_speech(text_content: str, autoplay: bool = False):
+def generate_guardian_speech(text_content: str, autoplay: bool = False, key_suffix: str = ""):
     """Converts the nutritional breakdown into a high-performance audio cue."""
     try:
         tts = gTTS(text=text_content, lang='en', tld='com', slow=False)
@@ -45,13 +46,11 @@ def generate_guardian_speech(text_content: str, autoplay: bool = False):
         b64_audio = base64.b64encode(audio_bytes).decode()
         
         if autoplay:
-            # Injecting hidden HTML5 audio element with autoplay protocol
             st.markdown(
                 f'<audio src="data:audio/mp3;base64,{b64_audio}" autoplay="true" style="display:none;"></audio>',
                 unsafe_allow_html=True
             )
         else:
-            # Standard audio widget layout for manual requests
             st.audio(audio_bytes, format="audio/mp3")
     except Exception as e:
         st.error(f"⚠️ Voice link generation stall: {e}")
@@ -153,7 +152,9 @@ def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
         "shake": {"name": "Whey Protein Shake", "weight": 40, "p": 30, "c": 3, "f": 2, "cal": 150},
         "yogurt": {"name": "Greek Yogurt", "weight": 200, "p": 20, "c": 7, "f": 0, "cal": 110},
         "burger": {"name": "Double Cheeseburger", "weight": 220, "p": 32, "c": 36, "f": 28, "cal": 530},
-        "milkshake": {"name": "Chocolate Milkshake (Large)", "weight": 400, "p": 12, "c": 95, "f": 14, "cal": 560}
+        "milkshake": {"name": "Chocolate Milkshake (Large)", "weight": 400, "p": 12, "c": 95, "f": 14, "cal": 560},
+        "coffee": {"name": "Black Coffee", "weight": 250, "p": 0.5, "c": 0, "f": 0, "cal": 5},
+        "chocolate": {"name": "Dark Chocolate", "weight": 40, "p": 3, "c": 18, "f": 12, "cal": 200}
     }
     
     for keyword, macros in local_db.items():
@@ -173,7 +174,7 @@ def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
             
     if not detected_ingredients:
         detected_ingredients.append(Ingredient(
-            name="Unspecified Meal Volume", estimated_weight_g=200, protein_g=15.0, carbs_g=30.0, fats_g=10.0, calories=270
+            name="Unspecified Meal Volume", templates=200, protein_g=15.0, carbs_g=30.0, fats_g=10.0, calories=270
         ))
         
     total_cal = sum(ing.calories for ing in detected_ingredients)
@@ -211,7 +212,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("EATING WELL // BIOLOGICAL INTERFACE")
-st.caption("A16Z SPEEDRUN SYSTEM ARCHITECTURE V2.3 // THE BIMODAL CONVERSATIONAL HEALTH HUD")
+st.caption("A16Z SPEEDRUN SYSTEM ARCHITECTURE V2.4 // THE AUDIO PERSISTENCE CONSOLE HUD")
 
 if not api_key_env:
     st.warning("⚠️ Running in Local Fallback Node. GEMINI_API_KEY environment variable not configured.")
@@ -266,24 +267,27 @@ with tab1:
     if execute_analysis:
         with st.spinner("Analyzing macro vectors via Gemini 2.5 Engine..."):
             analysis_result = autonomous_logger(text_desc, uploaded_image)
-            save_meal_to_history(analysis_result)
-            st.session_state.food_history = load_stored_history()
             
-            # Format the Coach voice string and cache it for the interactive player button
             total_protein = sum(ing.protein_g for ing in analysis_result.ingredients)
-            st.session_state.visual_speech_text = (
+            voice_script = (
                 f"Massive intake logged. {analysis_result.meal_name} processed at {analysis_result.total_calories} total calories. "
                 f"That is {int(total_protein)} grams of pure protein locked into your strength reserves. Fueling complete. Execute your next operational sprint."
             )
+            
+            # Save voice track cleanly inside the object before storing in JSON
+            analysis_result.guardian_voice_script = voice_script
+            
+            save_meal_to_history(analysis_result)
+            st.session_state.food_history = load_stored_history()
+            st.session_state.visual_speech_text = voice_script
             st.success("🧬 Macro asset securely mapped to local database diary.")
             st.rerun()
 
-    # Drop optional voice player button cleanly right under the text/image scanning response block
     if "visual_speech_text" in st.session_state:
         st.markdown("---")
         st.markdown("### 🎙️ AI Guardian Voice Core")
         st.write("Review complete. Press play below to listen to your tactical biometric readout briefing:")
-        generate_guardian_speech(st.session_state.visual_speech_text, autoplay=False)
+        generate_guardian_speech(st.session_state.visual_speech_text, autoplay=False, key_suffix="manual_tab")
 
 with tab2:
     st.write("Communicate directly with your AI Guardian hands-free while driving, train-loading, or shopping.")
@@ -325,33 +329,30 @@ with tab2:
                         )
                         analysis_result = MealAnalysis.model_validate_json(response.text)
                     else:
-                        analysis_result = local_heuristic_fallback("double cheeseburger chocolate milkshake")
+                        analysis_result = local_heuristic_fallback("black coffee dark chocolate")
                     
                     if os.path.exists(temp_audio_path):
                         os.remove(temp_audio_path)
                     
-                    save_meal_to_history(analysis_result)
-                    st.session_state.food_history = load_stored_history()
-                    st.session_state.last_processed_voice = voice_capture.name
-                    
-                    # Compute the voice parameters instantly for auto-playing voice response
                     v_protein = sum(ing.protein_g for ing in analysis_result.ingredients)
                     voice_script = (
                         f"Massive intake logged. {analysis_result.meal_name} processed at {analysis_result.total_calories} total calories. "
                         f"That is {int(v_protein)} grams of pure protein locked into your strength reserves. Fueling complete. Execute your next operational sprint."
                     )
                     
-                    # Store voice track to context so it renders text details along with audio play
+                    analysis_result.guardian_voice_script = voice_script
+                    
+                    save_meal_to_history(analysis_result)
+                    st.session_state.food_history = load_stored_history()
+                    st.session_state.last_processed_voice = voice_capture.name
                     st.session_state.voice_autoplay_script = voice_script
                     st.rerun()
 
                 except Exception as audio_err:
                     st.error(f"❌ Error compiling voice array: {audio_err}")
                     
-        # Automatically fire audio response through browser speakers when voice tab updates
         if "voice_autoplay_script" in st.session_state:
-            generate_guardian_speech(st.session_state.voice_autoplay_script, autoplay=True)
-            # Clear it from state right after autoplaying so it doesn't shout every single time you navigate the page
+            generate_guardian_speech(st.session_state.voice_autoplay_script, autoplay=True, key_suffix="auto_tab")
             del st.session_state.voice_autoplay_script
 
 # -------------------------------------------------------------------
@@ -362,6 +363,9 @@ st.header("📜 HISTORICAL MACRO RECONSTRUCTION DIARY")
 
 if st.session_state.food_history:
     for index, past_meal in enumerate(reversed(st.session_state.food_history)):
+        # Generate a clean unique key using string indexing
+        unique_key = f"playback_{len(st.session_state.food_history) - 1 - index}"
+        
         with st.container():
             st.markdown(f"""
                 <div class="hud-card" style="border-color: #39FF14; margin-bottom: 12px;">
@@ -369,6 +373,13 @@ if st.session_state.food_history:
                     <h4 style="color: #FFFFFF; margin: 5px 0;">Total Structural Intakes: {past_meal.get('total_calories', 0)} kcal</h4>
                 </div>
             """, unsafe_allow_html=True)
+            
+            # Expose the permanent, on-demand playback module directly inside the historical stream
+            script_to_speak = past_meal.get("guardian_voice_script")
+            if script_to_speak:
+                st.caption("🎙️ **On-Demand AI Audio Playback Console:**")
+                generate_guardian_speech(script_to_speak, autoplay=False, key_suffix=unique_key)
+                
             with st.expander(f"Inspect Macro Array Breakdown for {past_meal.get('meal_name')}"):
                 st.json(past_meal)
 else:
