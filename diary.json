@@ -1,0 +1,197 @@
+[
+    {
+        "meal_name": "Greek yogurt with honey and almonds",
+        "confidence_score": 0.9,
+        "ingredients": [
+            {
+                "name": "Greek yogurt",
+                "estimated_weight_g": 170.0,
+                "protein_g": 17.0,
+                "carbs_g": 7.0,
+                "fats_g": 0.0,
+                "calories": 100
+            },
+            {
+                "name": "Honey",
+                "estimated_weight_g": 10.0,
+                "protein_g": 0.0,
+                "carbs_g": 8.0,
+                "fats_g": 0.0,
+                "calories": 30
+            },
+            {
+                "name": "Almonds",
+                "estimated_weight_g": 25.0,
+                "protein_g": 5.0,
+                "carbs_g": 6.0,
+                "fats_g": 12.0,
+                "calories": 145
+            }
+        ],
+        "total_calories": 275
+    },
+    {
+        "meal_name": "Greek yogurt with honey and almonds",
+        "confidence_score": 0.9,
+        "ingredients": [
+            {
+                "name": "Greek yogurt",
+                "estimated_weight_g": 170.0,
+                "protein_g": 17.0,
+                "carbs_g": 7.0,
+                "fats_g": 0.0,
+                "calories": 100
+            },
+            {
+                "name": "Honey",
+                "estimated_weight_g": 31.5,
+                "protein_g": 0.0,
+                "carbs_g": 26.0,
+                "fats_g": 0.0,
+                "calories": 96
+            },
+            {
+                "name": "Almonds",
+                "estimated_weight_g": 25.0,
+                "protein_g": 5.0,
+                "carbs_g": 6.0,
+                "fats_g": 12.0,
+                "calories": 145
+            }
+        ],
+        "total_calories": 341
+    },
+    {
+        "meal_name": "Greek yogurt with honey and almonds",
+        "confidence_score": 0.9,
+        "ingredients": [
+            {
+                "name": "Greek yogurt",
+                "estimated_weight_g": 170.0,
+                "protein_g": 17.0,
+                "carbs_g": 6.8,
+                "fats_g": 0.0,
+                "calories": 100
+            },
+            {
+                "name": "Honey",
+                "estimated_weight_g": 21.0,
+                "protein_g": 0.1,
+                "carbs_g": 17.2,
+                "fats_g": 0.0,
+                "calories": 64
+            },
+            {
+                "name": "Almonds",
+                "estimated_weight_g": 25.0,
+                "protein_g": 5.3,
+                "carbs_g": 5.5,
+                "fats_g": 12.3,
+                "calories": 145
+            }
+        ],
+        "total_calories": 309
+    },
+    {
+        "meal_name": "Double Cheeseburger and Large Chocolate Milkshake",
+        "confidence_score": 0.9,
+        "ingredients": [
+            {
+                "name": "Beef Patties",
+                "estimated_weight_g": 100.0,
+                "protein_g": 25.0,
+                "carbs_g": 0.0,
+                "fats_g": 20.0,
+                "calories": 280
+            },
+            {
+                "name": "American Cheese",
+                "estimated_weight_g": 40.0,
+                "protein_g": 8.0,
+                "carbs_g": 2.0,
+                "fats_g": 12.0,
+                "calories": 140
+            },
+            {
+                "name": "Burger Bun",
+                "estimated_weight_g": 90.0,
+                "protein_g": 9.0,
+                "carbs_g": 45.0,
+                "fats_g": 5.0,
+                "calories": 250
+            },
+            {
+                "name": "Condiments (Ketchup, Mustard, Pickles)",
+                "estimated_weight_g": 20.0,
+                "protein_g": 1.0,
+                "carbs_g": 5.0,
+                "fats_g": 1.0,
+                "calories": 30
+            },
+            {
+                "name": "Chocolate Milkshake",
+                "estimated_weight_g": 550.0,
+                "protein_g": 20.0,
+                "carbs_g": 130.0,
+                "fats_g": 25.0,
+                "calories": 800
+            }
+        ],
+        "total_calories": 1500
+    },
+    {
+        "meal_name": "Grilled Salmon with Brown Rice and Roasted Vegetables",
+        "confidence_score": 0.95,
+        "ingredients": [
+            {
+                "name": "Grilled Salmon Fillet",
+                "estimated_weight_g": 170.0,
+                "protein_g": 34.0,
+                "carbs_g": 0.0,
+                "fats_g": 22.1,
+                "calories": 354
+            },
+            {
+                "name": "Cooked Brown Rice",
+                "estimated_weight_g": 150.0,
+                "protein_g": 4.1,
+                "carbs_g": 34.5,
+                "fats_g": 1.4,
+                "calories": 167
+            },
+            {
+                "name": "Cooked Asparagus",
+                "estimated_weight_g": 100.0,
+                "protein_g": 2.2,
+                "carbs_g": 3.9,
+                "fats_g": 0.2,
+                "calories": 20
+            },
+            {
+                "name": "Mixed Bell Peppers",
+                "estimated_weight_g": 50.0,
+                "protein_g": 0.5,
+                "carbs_g": 3.0,
+                "fats_g": 0.2,
+                "calories": 16
+            },
+            {
+                "name": "Cherry Tomatoes",
+                "estimated_weight_g": 40.0,
+                "protein_g": 0.4,
+                "carbs_g": 1.6,
+                "fats_g": 0.1,
+                "calories": 7
+            },
+            {
+                "name": "Small Roasted Vegetables (e.g., zucchini/squash)",
+                "estimated_weight_g": 30.0,
+                "protein_g": 0.4,
+                "carbs_g": 0.9,
+                "fats_g": 0.1,
+                "calories": 5
+            }
+        ],
+        "total_calories": 569
+    }
+]
