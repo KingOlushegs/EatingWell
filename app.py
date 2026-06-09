@@ -104,18 +104,41 @@ with left_input:
         if raw_text or temp_image_path:
             with st.spinner("Processing unstructured context autonomously..."):
                 try:
+                    # Request pipeline analysis from backend engine
                     meal_analysis = autonomous_logger(raw_text, image_path=temp_image_path)
                     save_meal_to_db(meal_analysis)
                     st.success(f"Successfully logged: '{meal_analysis.meal_name}'")
                     
+                    # --- INTERFACE DISPLAY FOR STRATEGIC DECISION LAYER ---
+                    # Checks dynamically if engine response has our custom strategic fields
+                    if hasattr(meal_analysis, 'strategic_layer') and meal_analysis.strategic_layer:
+                        st.markdown("---")
+                        st.subheader("⚡ Immediate Strategic Decision Layer")
+                        
+                        metabolic_now = getattr(meal_analysis.strategic_layer, 'metabolic_impact_the_now', None)
+                        downstream_next = getattr(meal_analysis.strategic_layer, 'downstream_compensation_the_next', None)
+                        
+                        if metabolic_now:
+                            st.info(f"**Immediate Metabolic Impact (The NOW):**\n\n{metabolic_now}")
+                        if downstream_next:
+                            st.warning(f"**Downstream Compensation (The NEXT):**\n\n{downstream_next}")
+                    
                     if temp_image_path and os.path.exists(temp_image_path):
                         os.remove(temp_image_path)
+                    
+                    # Small delay sleep so the user can actually see the generated strategic advice box before page refresh
+                    import time
+                    time.sleep(4.0)
                     st.rerun()
+                    
                 except Exception as e:
                     from engine import local_heuristic_fallback
                     offline_analysis = local_heuristic_fallback(raw_text if raw_text else "Photo Log (Offline)")
                     save_meal_to_db(offline_analysis)
                     st.success(f"💾 Offline preservation activated: '{offline_analysis.meal_name}'")
+                    
+                    import time
+                    time.sleep(2.0)
                     st.rerun()
         else:
             st.warning("Please provide either a text description or a food photo.")
@@ -131,7 +154,7 @@ with right_coach:
                 insights = temp_tracker.generate_coaching_insights()
                 st.info(insights)
 
-# Historical Timeline Ledger
+# Historical Timeline Ledger with Nested Strategic Display
 st.markdown("---")
 st.subheader("📂 Historical Timeline Ledger")
 if history:
@@ -140,5 +163,14 @@ if history:
             st.write("**Detailed Ingredient Array Breakdowns:**")
             for ing in meal['ingredients']:
                 st.write(f"- **{ing['name']}** ({ing['estimated_weight_g']}g): Protein: {ing['protein_g']}g | Carbs: {ing['carbs_g']}g | Fats: {ing['fats_g']}g | Calories: {ing['calories']} kcal")
+            
+            # Persist historical strategic layers within the history view blocks if they exist in DB records
+            if "strategic_layer" in meal and meal["strategic_layer"]:
+                st.markdown("---")
+                st.markdown("**⚡ Logged Strategic Metrics:**")
+                strat = meal["strategic_layer"]
+                if isinstance(strat, dict):
+                    st.text(f"💡 Impact: {strat.get('metabolic_impact_the_now', 'N/A')}")
+                    st.text(f"🎯 Compensation: {strat.get('downstream_compensation_the_next', 'N/A')}")
 else:
     st.text("No data streams detected in sqlite3 cluster storage.")
