@@ -1,6 +1,4 @@
 import os
-from dotenv import load_dotenv
-load_dotenv()
 import streamlit as st
 from google import genai
 from google.genai import types
@@ -12,8 +10,17 @@ import json
 import base64
 from gtts import gTTS
 
+# --- ZERO-DEPENDENCY KEY LOADER ---
+# Bypasses local .env loading issues by manually registering keys directly into environment memory
+if os.path.exists(".env"):
+    with open(".env", "r") as f:
+        for line in f:
+            if line.strip() and not line.startswith("#"):
+                key, value = line.strip().split("=", 1)
+                os.environ[key.strip()] = value.strip().strip('"').strip("'")
+
 # -------------------------------------------------------------------
-# 1. DATA STRUCTURES & PYDANTIC STRUCTURAL SCHEMAS
+# 1. UPGRADED DATA STRUCTURES & STRATEGIC SCHEMAS
 # -------------------------------------------------------------------
 class Ingredient(BaseModel):
     name: str = Field(description="The name of the food item.")
@@ -23,12 +30,23 @@ class Ingredient(BaseModel):
     fats_g: float = Field(description="Grams of fats.")
     calories: int = Field(description="Total calories.")
 
+class StrategicDecisions(BaseModel):
+    metabolic_impact_the_now: str = Field(
+        description="A short sentence explaining how this meal profile will affect blood sugar, cortisol, or focus over the next 2 hours."
+    )
+    downstream_compensation_the_next: str = Field(
+        description="Direct, actionable advice on what the user should eat, adjust, or avoid during their next meal block to maintain biological balance."
+    )
+
 class MealAnalysis(BaseModel):
     meal_name: str = Field(description="Clean title for the meal.")
     confidence_score: float = Field(description="Confidence rating 0.0 to 1.0.")
     ingredients: List[Ingredient]
     total_calories: int = Field(description="Sum of all calories.")
     guardian_voice_script: Optional[str] = Field(default=None, description="The text script generated for the AI coach response.")
+    strategic_layer: StrategicDecisions = Field(
+        description="The actionable insights that translate raw metrics into immediate tactical choices for the user."
+    )
 
 # -------------------------------------------------------------------
 # 2. VOICE SYNTHESIS MECHANICS (HIGH-PERFORMANCE COACH HUD)
@@ -100,7 +118,8 @@ st.session_state.clarity_pool = base_clarity
 # -------------------------------------------------------------------
 # 4. CORE BACKEND INGESTION ENGINES (GEMINI & FALLBACK)
 # -------------------------------------------------------------------
-api_key_env = os.environ.get("GEMINI_API_KEY")
+# Look for local environmental key first, fall back seamlessly to Streamlit Cloud standard secrets
+api_key_env = os.environ.get("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", None)
 client = genai.Client(api_key=api_key_env) if api_key_env else None
 
 def autonomous_logger(raw_input: str, image_file=None) -> MealAnalysis:
@@ -108,14 +127,15 @@ def autonomous_logger(raw_input: str, image_file=None) -> MealAnalysis:
         return local_heuristic_fallback(raw_input or "Uploaded Image Track")
 
     base_prompt = (
-        "You are the vision and text ingestion engine for an autonomous nutrition app. "
-        "Analyze the provided input (text description, image, or both), extract all food items, "
-        "estimate their weights in grams, and calculate their precise macronutrient breakdown."
+        "You are the vision, text ingestion, and strategic health optimization engine for an autonomous nutrition platform. "
+        "Analyze the provided input context (text description, image, or both), extract all food items, "
+        "estimate their weights in grams, calculate their precise macronutrient breakdown, and formulate "
+        "hyper-targeted strategic health decisions under the strategic_layer property matching the exact schema configuration."
     )
     
     contents = [base_prompt]
     if raw_input:
-        contents.append(f"User Text Description: {raw_input}")
+        contents.append(f"User Input Context: {raw_input}")
     if image_file:
         try:
             img = Image.open(image_file)
@@ -134,7 +154,9 @@ def autonomous_logger(raw_input: str, image_file=None) -> MealAnalysis:
             ),
         )
         return MealAnalysis.model_validate_json(response.text)
-    except Exception:
+    except Exception as api_error:
+        # Debugging hook to help verify pipeline structural safety
+        st.sidebar.warning(f"Engine routing fallback triggered: {str(api_error)}")
         return local_heuristic_fallback(raw_input or "Image Scan Fallback")
 
 def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
@@ -173,7 +195,6 @@ def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
             ))
             
     if not detected_ingredients:
-        # FIX: Removed 'templates=200' to perfectly match the defined Ingredient Pydantic schema
         detected_ingredients.append(Ingredient(
             name="Unspecified Meal Volume", 
             estimated_weight_g=200.0, 
@@ -185,18 +206,23 @@ def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
         
     total_cal = sum(ing.calories for ing in detected_ingredients)
     
+    # Static mockup decisions to keep fallback paths structurally compliant
+    mock_strategic = StrategicDecisions(
+        metabolic_impact_the_now="Offline Mode: Standard baseline metabolic pacing estimated.",
+        downstream_compensation_the_next="Offline Mode: Re-evaluate balance upon live cloud synchronization."
+    )
+    
     return MealAnalysis(
         meal_name=f"[Offline Log] {raw_input[:30]}...",
         confidence_score=0.3,
         ingredients=detected_ingredients,
-        total_calories=total_cal
+        total_calories=total_cal,
+        strategic_layer=mock_strategic
     )
 
 # -------------------------------------------------------------------
 # 5. STREAMLIT APPLICATION STATE CONFIGURATIONS
 # -------------------------------------------------------------------
-st.set_page_config(page_title="Eating Well // Bio-Intelligence Engine", layout="wide")
-
 st.markdown("""
     <style>
     .reportview-container { background: #050505; color: #E0E0E0; }
@@ -261,7 +287,6 @@ tab1, tab2 = st.tabs(["🖼️ Visual/Text Multi-Modal Scanner", "🎙️ Ambien
 with tab1:
     col_input, col_view = st.columns([1, 1])
     
-    # FIX: Wrapped inputs in a logical form structure to capture native mobile/desktop ENTER signals instantly
     with col_input:
         with st.form(key="ingestion_scan_form", clear_on_submit=False):
             text_desc = st.text_input("Manually declare food elements (e.g., 'Double steak with brown rice')", key="text_desc")
@@ -283,7 +308,6 @@ with tab1:
                     f"That is {int(total_protein)} grams of pure protein locked into your strength reserves. Fueling complete. Execute your next operational sprint."
                 )
                 
-                # Save voice track cleanly inside the object before storing in JSON
                 analysis_result.guardian_voice_script = voice_script
                 
                 save_meal_to_history(analysis_result)
@@ -325,7 +349,7 @@ with tab2:
                         contents = [
                             "You are the vision, text, and audio ingestion engine for an autonomous nutrition app. "
                             "Analyze the provided audio track, extract all food items, estimate their weights in grams, "
-                            "and calculate their precise macronutrient breakdown.",
+                            "and calculate their precise macronutrient breakdown and high-performance decisions.",
                             audio_asset
                         ]
                         
@@ -367,7 +391,7 @@ with tab2:
             del st.session_state.voice_autoplay_script
 
 # -------------------------------------------------------------------
-# 8. HISTORICAL ACTIVITY STREAM (THE EYE OF THE ENGINE)
+# 8. HISTORICAL ACTIVITY STREAM (THE EYE OF THE ENGINE) WITH STRATEGIC LAYER
 # -------------------------------------------------------------------
 st.markdown("---")
 st.header("📜 HISTORICAL MACRO RECONSTRUCTION DIARY")
@@ -383,6 +407,15 @@ if st.session_state.food_history:
                     <h4 style="color: #FFFFFF; margin: 5px 0;">Total Structural Intakes: {past_meal.get('total_calories', 0)} kcal</h4>
                 </div>
             """, unsafe_allow_html=True)
+            
+            # VISUAL RENDERING: Displaying the Strategic Decision Layer fields beautifully
+            strat_layer = past_meal.get("strategic_layer", {})
+            if strat_layer:
+                col_now, col_next = st.columns(2)
+                with col_now:
+                    st.info(f"**⚡ Immediate Metabolic Impact (The NOW):**\n\n{strat_layer.get('metabolic_impact_the_now', 'N/A')}")
+                with col_next:
+                    st.warning(f"**🎯 Downstream Compensation (The NEXT):**\n\n{strat_layer.get('downstream_compensation_the_next', 'N/A')}")
             
             script_to_speak = past_meal.get("guardian_voice_script")
             if script_to_speak:
@@ -408,7 +441,8 @@ with col_quest:
     
     user_craving = st.selectbox(
         "Select your upcoming food flavor profile target:",
-        ["Warm & Savory", "Crisp & Fresh", "High-Protein Quick Fuel", "Slow Glycogen Energy"]
+        ["Warm & Savory", "Crisp & Fresh", "High-Protein Quick Fuel", "Slow Glycogen Energy"],
+        key="quest_select"
     )
     
     if st.button("Generate Proactive Quest Vector"):
@@ -426,8 +460,8 @@ with col_sync:
     st.subheader("🌦️ Biometric Activity Sync")
     st.caption("Harmonizing metabolic consumption indexes with outdoor environments.")
     
-    env_weather = st.selectbox("Current Environmental Telemetry Node", ["Clear & Sunny", "Overcast & Raining", "Freezing Temperatures"])
-    user_ingest_type = st.radio("Target Current Load Archetype:", ["Heavy Macro-Load Meal", "Light Focus Spark Energy"])
+    env_weather = st.selectbox("Current Environmental Telemetry Node", ["Clear & Sunny", "Overcast & Raining", "Freezing Temperatures"], key="weather_select")
+    user_ingest_type = st.radio("Target Current Load Archetype:", ["Heavy Macro-Load Meal", "Light Focus Spark Energy"], key="load_radio")
     
     if st.button("Process Environmental Habit Modifier"):
         st.markdown('<div class="hud-card" style="border-color: #39FF14;">', unsafe_allow_html=True)
