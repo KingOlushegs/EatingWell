@@ -173,8 +173,14 @@ def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
             ))
             
     if not detected_ingredients:
+        # FIX: Removed 'templates=200' to perfectly match the defined Ingredient Pydantic schema
         detected_ingredients.append(Ingredient(
-            name="Unspecified Meal Volume", templates=200, protein_g=15.0, carbs_g=30.0, fats_g=10.0, calories=270
+            name="Unspecified Meal Volume", 
+            estimated_weight_g=200.0, 
+            protein_g=15.0, 
+            carbs_g=30.0, 
+            fats_g=10.0, 
+            calories=270
         ))
         
     total_cal = sum(ing.calories for ing in detected_ingredients)
@@ -255,33 +261,38 @@ tab1, tab2 = st.tabs(["🖼️ Visual/Text Multi-Modal Scanner", "🎙️ Ambien
 with tab1:
     col_input, col_view = st.columns([1, 1])
     
+    # FIX: Wrapped inputs in a logical form structure to capture native mobile/desktop ENTER signals instantly
     with col_input:
-        text_desc = st.text_input("Manually declare food elements (e.g., 'Double steak with brown rice')", key="text_desc")
-        uploaded_image = st.file_uploader("Drop biological image target array", type=["png", "jpg", "jpeg"])
-        execute_analysis = st.button("Scan Biological Load")
+        with st.form(key="ingestion_scan_form", clear_on_submit=False):
+            text_desc = st.text_input("Manually declare food elements (e.g., 'Double steak with brown rice')", key="text_desc")
+            uploaded_image = st.file_uploader("Drop biological image target array", type=["png", "jpg", "jpeg"])
+            execute_analysis = st.form_submit_button("Scan Biological Load")
     
     with col_view:
         if uploaded_image:
             st.image(uploaded_image, caption="Target Asset Ingested", width=320)
 
     if execute_analysis:
-        with st.spinner("Analyzing macro vectors via Gemini 2.5 Engine..."):
-            analysis_result = autonomous_logger(text_desc, uploaded_image)
-            
-            total_protein = sum(ing.protein_g for ing in analysis_result.ingredients)
-            voice_script = (
-                f"Massive intake logged. {analysis_result.meal_name} processed at {analysis_result.total_calories} total calories. "
-                f"That is {int(total_protein)} grams of pure protein locked into your strength reserves. Fueling complete. Execute your next operational sprint."
-            )
-            
-            # Save voice track cleanly inside the object before storing in JSON
-            analysis_result.guardian_voice_script = voice_script
-            
-            save_meal_to_history(analysis_result)
-            st.session_state.food_history = load_stored_history()
-            st.session_state.visual_speech_text = voice_script
-            st.success("🧬 Macro asset securely mapped to local database diary.")
-            st.rerun()
+        if text_desc or uploaded_image:
+            with st.spinner("Analyzing macro vectors via Gemini 2.5 Engine..."):
+                analysis_result = autonomous_logger(text_desc, uploaded_image)
+                
+                total_protein = sum(ing.protein_g for ing in analysis_result.ingredients)
+                voice_script = (
+                    f"Massive intake logged. {analysis_result.meal_name} processed at {analysis_result.total_calories} total calories. "
+                    f"That is {int(total_protein)} grams of pure protein locked into your strength reserves. Fueling complete. Execute your next operational sprint."
+                )
+                
+                # Save voice track cleanly inside the object before storing in JSON
+                analysis_result.guardian_voice_script = voice_script
+                
+                save_meal_to_history(analysis_result)
+                st.session_state.food_history = load_stored_history()
+                st.session_state.visual_speech_text = voice_script
+                st.success("🧬 Macro asset securely mapped to local database diary.")
+                st.rerun()
+        else:
+            st.warning("Please enter a food profile or drop an image array to scan.")
 
     if "visual_speech_text" in st.session_state:
         st.markdown("---")
@@ -363,7 +374,6 @@ st.header("📜 HISTORICAL MACRO RECONSTRUCTION DIARY")
 
 if st.session_state.food_history:
     for index, past_meal in enumerate(reversed(st.session_state.food_history)):
-        # Generate a clean unique key using string indexing
         unique_key = f"playback_{len(st.session_state.food_history) - 1 - index}"
         
         with st.container():
@@ -374,7 +384,6 @@ if st.session_state.food_history:
                 </div>
             """, unsafe_allow_html=True)
             
-            # Expose the permanent, on-demand playback module directly inside the historical stream
             script_to_speak = past_meal.get("guardian_voice_script")
             if script_to_speak:
                 st.caption("🎙️ **On-Demand AI Audio Playback Console:**")
@@ -409,7 +418,7 @@ with col_quest:
             st.write(f"**AI Guardian:** 'Your current Strength profile is critically down at **{st.session_state.protein_pool}%**. Your optimal pathway for a **{user_craving}** profile demands exactly **35g+ of targeted clean protein**.'")
             st.info("💡 **Quest Path recommendations:** Pan-seared wild salmon over greens, or a double-sliced turkey burger stack.")
         else:
-            st.markdown("<span style='color: #39FF14; font-weight:bold;'>✅ LOGISTICAL PROFILE OPTIMAL</span>", unsafe_allow_html=True)
+            st.markdown("<span style='color: #39FF14; font-weight:bold;'>GENERIC PROFILE OPTIMAL</span>", unsafe_allow_html=True)
             st.write(f"**AI Guardian:** 'Metabolic levels are locked and stable. To satisfy your **{user_craving}** profile loop, maintain standard maintenance targets with clean greens and light grains.'")
         st.markdown('</div>', unsafe_allow_html=True)
 
