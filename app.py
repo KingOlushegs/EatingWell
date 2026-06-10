@@ -11,7 +11,6 @@ if os.path.exists(".env"):
         for line in f:
             if line.strip() and not line.startswith("#"):
                 key, value = line.strip().split("=", 1)
-                # .strip("'" + '"') removes both single and double quotes cleanly
                 os.environ[key.strip()] = value.strip().strip("'").strip('"')
 
 # Re-initialize upgraded schemas
@@ -71,16 +70,13 @@ st.markdown("---")
 if history:
     st.subheader("📊 Performance Trend Timelines")
     
-    # Structure database arrays into a DataFrame for visualization formatting
     chart_data = []
     for m in history:
-        # Extract short string date (YYYY-MM-DD)
         date_str = m["timestamp"].split(" ")[0]
         p_val = sum(ing['protein_g'] for ing in m['ingredients'])
         chart_data.append({"Date": date_str, "Calories": m["total_calories"], "Protein (g)": p_val})
         
     df = pd.DataFrame(chart_data)
-    # Group logs chronologically to handle multi-meal days cleanly
     grouped_df = df.groupby("Date").sum().sort_index()
 
     tab1, tab2 = st.tabs(["🔥 Calorie Volume Chronology", "🍗 Protein Intake Vectors"])
@@ -118,26 +114,53 @@ with left_input:
                     save_meal_to_db(meal_analysis)
                     st.success(f"Successfully logged: '{meal_analysis.meal_name}'")
                     
-                    # --- INTERFACE DISPLAY FOR STRATEGIC DECISION LAYER ---
-                    # Checks dynamically if engine response has our custom strategic fields
-                    if hasattr(meal_analysis, 'strategic_layer') and meal_analysis.strategic_layer:
-                        st.markdown("---")
-                        st.subheader("⚡ Immediate Strategic Decision Layer")
-                        
-                        metabolic_now = getattr(meal_analysis.strategic_layer, 'metabolic_impact_the_now', None)
-                        downstream_next = getattr(meal_analysis.strategic_layer, 'downstream_compensation_the_next', None)
-                        
-                        if metabolic_now:
-                            st.info(f"**Immediate Metabolic Impact (The NOW):**\n\n{metabolic_now}")
-                        if downstream_next:
-                            st.warning(f"**Downstream Compensation (The NEXT):**\n\n{downstream_next}")
+                    # --- INTERFACE DISPLAY FOR STRATEGIC & BEHAVIORAL LAYER ---
+                    st.markdown("---")
+                    st.subheader("⚡ Immediate Pipeline Feedback Array")
+                    
+                    # Itemized Ingredient Badges (Immediate view)
+                    if hasattr(meal_analysis, 'ingredients') and meal_analysis.ingredients:
+                        st.markdown("##### 🔍 Identified Meal Elements:")
+                        i_cols = st.columns(min(len(meal_analysis.ingredients), 4))
+                        for i, ing in enumerate(meal_analysis.ingredients):
+                            with i_cols[i % 4]:
+                                st.markdown(
+                                    f"""<div style='background: #1e1e1e; padding: 8px; border-radius: 5px; border-left: 3px solid #39FF14;'>
+                                    <strong>{ing.name}</strong> ({ing.estimated_weight_g}g)<br>
+                                    <span style='color: #39FF14;'>{ing.calories} kcal</span>
+                                    </div>""", unsafe_allow_html=True
+                                )
+                    
+                    # Split view for Strategic Analysis and Behavioral Compliance
+                    col_strat, col_behave = st.columns(2)
+                    
+                    with col_strat:
+                        if hasattr(meal_analysis, 'strategic_layer') and meal_analysis.strategic_layer:
+                            metabolic_now = getattr(meal_analysis.strategic_layer, 'metabolic_impact_the_now', None)
+                            downstream_next = getattr(meal_analysis.strategic_layer, 'downstream_compensation_the_next', None)
+                            if metabolic_now:
+                                st.info(f"**Immediate Metabolic Impact (The NOW):**\n\n{metabolic_now}")
+                            if downstream_next:
+                                st.warning(f"**Downstream Compensation (The NEXT):**\n\n{downstream_next}")
+                                
+                    with col_behave:
+                        if hasattr(meal_analysis, 'behavioral_matrix') and meal_analysis.behavioral_matrix:
+                            hydration = getattr(meal_analysis.behavioral_matrix, 'hydration_status', None)
+                            etiquette = getattr(meal_analysis.behavioral_matrix, 'environmental_etiquette', None)
+                            if hydration:
+                                st.success(f"**💧 Hydration Vector:**\n\n{hydration}")
+                            if etiquette:
+                                st.markdown(
+                                    f"""<div style='background: #2b1818; padding: 12px; border-radius: 5px; border: 1px solid #ff4b4b; color: #E0E0E0;'>
+                                    <strong style='color: #ff4b4b;'>🍽️ Behavioral Etiquette Note:</strong><br>{etiquette}
+                                    </div>""", unsafe_allow_html=True
+                                )
                     
                     if temp_image_path and os.path.exists(temp_image_path):
                         os.remove(temp_image_path)
                     
-                    # Small delay sleep so the user can actually see the generated strategic advice box before page refresh
                     import time
-                    time.sleep(4.0)
+                    time.sleep(5.0)  # Extended time block to review immediate structural callouts
                     st.rerun()
                     
                 except Exception as e:
@@ -163,23 +186,49 @@ with right_coach:
                 insights = temp_tracker.generate_coaching_insights()
                 st.info(insights)
 
-# Historical Timeline Ledger with Nested Strategic Display
+# --- HISTORICAL TIMELINE LEDGER ---
 st.markdown("---")
 st.subheader("📂 Historical Timeline Ledger")
 if history:
     for idx, meal in enumerate(history, 1):
         with st.expander(f"{idx}. {meal['meal_name']} — {meal['total_calories']} kcal ({meal['timestamp']})"):
-            st.write("**Detailed Ingredient Array Breakdowns:**")
-            for ing in meal['ingredients']:
-                st.write(f"- **{ing['name']}** ({ing['estimated_weight_g']}g): Protein: {ing['protein_g']}g | Carbs: {ing['carbs_g']}g | Fats: {ing['fats_g']}g | Calories: {ing['calories']} kcal")
             
-            # Persist historical strategic layers within the history view blocks if they exist in DB records
-            if "strategic_layer" in meal and meal["strategic_layer"]:
-                st.markdown("---")
-                st.markdown("**⚡ Logged Strategic Metrics:**")
-                strat = meal["strategic_layer"]
-                if isinstance(strat, dict):
-                    st.text(f"💡 Impact: {strat.get('metabolic_impact_the_now', 'N/A')}")
-                    st.text(f"🎯 Compensation: {strat.get('downstream_compensation_the_next', 'N/A')}")
+            # Itemized breakdown block
+            st.markdown("**🔍 Identified Meal Elements & Individual Macro Load:**")
+            h_ingredients = meal.get('ingredients', [])
+            if h_ingredients:
+                h_cols = st.columns(min(len(h_ingredients), 4))
+                for i, ing in enumerate(h_ingredients):
+                    with h_cols[i % 4]:
+                        st.markdown(
+                            f"""<div style='background: #141414; padding: 10px; border-radius: 5px; border: 1px solid #262626;'>
+                            <strong>{ing.get('name')}</strong> ({ing.get('estimated_weight_g')}g)<br>
+                            <span style='color: #39FF14;'>⚡ {ing.get('calories')} kcal</span><br>
+                            <small style='color: #888;'>P: {ing.get('protein_g')}g | C: {ing.get('carbs_g')}g | F: {ing.get('fats_g')}g</small>
+                            </div>""", unsafe_allow_html=True
+                        )
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Nested Strategic & Behavioral Historical Blocks
+            col_hist_left, col_hist_right = st.columns(2)
+            
+            with col_hist_left:
+                if "strategic_layer" in meal and meal["strategic_layer"]:
+                    st.markdown("**⚡ Logged Strategic Metrics:**")
+                    strat = meal["strategic_layer"]
+                    if isinstance(strat, dict):
+                        st.info(f"💡 **Impact:** {strat.get('metabolic_impact_the_now', 'N/A')}\n\n🎯 **Compensation:** {strat.get('downstream_compensation_the_next', 'N/A')}")
+            
+            with col_hist_right:
+                if "behavioral_matrix" in meal and meal["behavioral_matrix"]:
+                    st.markdown("**🍽️ Contextual & Behavioral Audits:**")
+                    behave = meal["behavioral_matrix"]
+                    if isinstance(behave, dict):
+                        st.success(f"💧 **Hydration Status:** {behave.get('hydration_status', 'N/A')}")
+                        st.markdown(
+                            f"""<div style='background: #231919; padding: 10px; border-radius: 5px; border: 1px solid #ff4b4b; font-size: 14px;'>
+                            <span style='color: #ff4b4b; font-weight: bold;'>Etiquette/Environment Analysis:</span><br>{behave.get('environmental_etiquette', 'N/A')}
+                            </div>""", unsafe_allow_html=True
+                        )
 else:
     st.text("No data streams detected in sqlite3 cluster storage.")

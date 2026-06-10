@@ -38,6 +38,14 @@ class StrategicDecisions(BaseModel):
         description="Direct, actionable advice on what the user should eat, adjust, or avoid during their next meal block to maintain biological balance."
     )
 
+class BehavioralMatrix(BaseModel):
+    hydration_status: str = Field(
+        description="Explicitly note if drinking water is visible, mentioned, or missing. If completely absent, subtly remind the user to hydrate."
+    )
+    environmental_etiquette: str = Field(
+        description="Analyze the context for table manners, eating environments, or frantic behaviors (e.g., eating fast at a messy workspace desk vs sitting down). Subtly point out manners or habits to adjust."
+    )
+
 class MealAnalysis(BaseModel):
     meal_name: str = Field(description="Clean title for the meal.")
     confidence_score: float = Field(description="Confidence rating 0.0 to 1.0.")
@@ -46,6 +54,9 @@ class MealAnalysis(BaseModel):
     guardian_voice_script: Optional[str] = Field(default=None, description="The text script generated for the AI coach response.")
     strategic_layer: StrategicDecisions = Field(
         description="The actionable insights that translate raw metrics into immediate tactical choices for the user."
+    )
+    behavioral_matrix: BehavioralMatrix = Field(
+        description="The behavioural hygiene vector evaluating presence of drinking water and structural environmental etiquette/table manners."
     )
 
 # -------------------------------------------------------------------
@@ -130,7 +141,9 @@ def autonomous_logger(raw_input: str, image_file=None) -> MealAnalysis:
         "You are the vision, text ingestion, and strategic health optimization engine for an autonomous nutrition platform. "
         "Analyze the provided input context (text description, image, or both), extract all food items, "
         "estimate their weights in grams, calculate their precise macronutrient breakdown, and formulate "
-        "hyper-targeted strategic health decisions under the strategic_layer property matching the exact schema configuration."
+        "hyper-targeted strategic health decisions under the strategic_layer property. "
+        "CRITICAL ANALYSIS: Evaluate the user's context for table manners, hydration presence, and environmental etiquette. "
+        "Map these insights exactly into the behavioural_matrix schema object fields."
     )
     
     contents = [base_prompt]
@@ -211,13 +224,19 @@ def local_heuristic_fallback(raw_input: str) -> MealAnalysis:
         metabolic_impact_the_now="Offline Mode: Standard baseline metabolic pacing estimated.",
         downstream_compensation_the_next="Offline Mode: Re-evaluate balance upon live cloud synchronization."
     )
+
+    mock_behavioral = BehavioralMatrix(
+        hydration_status="Offline Mode: Fluid telemetry intake status unverified.",
+        environmental_etiquette="Offline Mode: Environmental setup analysis requires active cloud connection."
+    )
     
     return MealAnalysis(
         meal_name=f"[Offline Log] {raw_input[:30]}...",
         confidence_score=0.3,
         ingredients=detected_ingredients,
         total_calories=total_cal,
-        strategic_layer=mock_strategic
+        strategic_layer=mock_strategic,
+        behavioral_matrix=mock_behavioral
     )
 
 # -------------------------------------------------------------------
@@ -349,7 +368,9 @@ with tab2:
                         contents = [
                             "You are the vision, text, and audio ingestion engine for an autonomous nutrition app. "
                             "Analyze the provided audio track, extract all food items, estimate their weights in grams, "
-                            "and calculate their precise macronutrient breakdown and high-performance decisions.",
+                            "calculate their precise macronutrient breakdown, and formulate high-performance decisions. "
+                            "CRITICAL INFERENCE: Deeply listen to background noises, speech pace, and explicitly spoken text "
+                            "to decode fluid hydration habits and dining workspace manners. Populate these into the behavioral_matrix schemas.",
                             audio_asset
                         ]
                         
