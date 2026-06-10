@@ -412,7 +412,8 @@ with tab2:
             del st.session_state.voice_autoplay_script
 
 # -------------------------------------------------------------------
-# 8. HISTORICAL ACTIVITY STREAM (THE EYE OF THE ENGINE) WITH STRATEGIC LAYER
+# -------------------------------------------------------------------
+# 8. HISTORICAL ACTIVITY STREAM (THE EYE OF THE ENGINE) WITH MACRO BREAKDOWNS
 # -------------------------------------------------------------------
 st.markdown("---")
 st.header("📜 HISTORICAL MACRO RECONSTRUCTION DIARY")
@@ -429,7 +430,24 @@ if st.session_state.food_history:
                 </div>
             """, unsafe_allow_html=True)
             
-            # VISUAL RENDERING: Displaying the Strategic Decision Layer fields beautifully
+            # 👇 NEW ELEMENT: Loop through and display individual ingredient breakdowns
+            ingredients = past_meal.get("ingredients", [])
+            if ingredients:
+                st.markdown("##### 🥗 **Logged Core Elements:**")
+                # Render as a clean, structured table for quick scannability
+                table_data = []
+                for ing in ingredients:
+                    table_data.append({
+                        "Item": ing.get("name"),
+                        "Weight (g)": f"{ing.get('estimated_weight_g', 0)}g",
+                        "Protein": f"{ing.get('protein_g', 0)}g",
+                        "Carbs": f"{ing.get('carbs_g', 0)}g",
+                        "Fats": f"{ing.get('fats_g', 0)}g",
+                        "Calories": f"{ing.get('calories', 0)} kcal"
+                    })
+                st.table(table_data)
+            
+            # Visual Rendering for Strategic Optimization Decisions
             strat_layer = past_meal.get("strategic_layer", {})
             if strat_layer:
                 col_now, col_next = st.columns(2)
@@ -438,16 +456,20 @@ if st.session_state.food_history:
                 with col_next:
                     st.warning(f"**🎯 Downstream Compensation (The NEXT):**\n\n{strat_layer.get('downstream_compensation_the_next', 'N/A')}")
             
+            # Visual Rendering for Behavioral Matrix Analytics
+            behavior_matrix = past_meal.get("behavioral_matrix", {})
+            if behavior_matrix:
+                with st.expander("🔬 View Behavioral Hygiene Insights"):
+                    st.write(f"**💧 Hydration Vector:** {behavior_matrix.get('hydration_status', 'N/A')}")
+                    st.write(f"**🪑 Environmental Etiquette:** {behavior_matrix.get('environmental_etiquette', 'N/A')}")
+
             script_to_speak = past_meal.get("guardian_voice_script")
             if script_to_speak:
                 st.caption("🎙️ **On-Demand AI Audio Playback Console:**")
                 generate_guardian_speech(script_to_speak, autoplay=False, key_suffix=unique_key)
                 
-            with st.expander(f"Inspect Macro Array Breakdown for {past_meal.get('meal_name')}"):
+            with st.expander(f"Inspect Raw Data Payload for {past_meal.get('meal_name')}"):
                 st.json(past_meal)
-else:
-    st.info("No biometric meal tracks registered inside the permanent data array yet. Speak or upload a meal target above to initialize.")
-
 # -------------------------------------------------------------------
 # 9. ADVANCED PROACTIVE MECHANICS: THE NEXT QUEST & ACTIVITY SYNC
 # -------------------------------------------------------------------
