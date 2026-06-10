@@ -5,6 +5,15 @@ from engine import autonomous_logger
 from database import init_db, save_meal_to_db, load_meals_from_db, get_active_profile, update_active_profile, get_all_profiles
 from tracker import DailyNutritionTracker
 
+# --- ZERO-DEPENDENCY KEY LOADER ---
+if os.path.exists(".env"):
+    with open(".env", "r") as f:
+        for line in f:
+            if line.strip() and not line.startswith("#"):
+                key, value = line.strip().split("=", 1)
+                # .strip("'" + '"') removes both single and double quotes cleanly
+                os.environ[key.strip()] = value.strip().strip("'").strip('"')
+
 # Re-initialize upgraded schemas
 init_db()
 
